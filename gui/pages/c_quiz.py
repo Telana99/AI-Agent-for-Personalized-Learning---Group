@@ -83,8 +83,10 @@ Format:
             "options": options_dict,
             "correct_key": correct_key
         }
-    except Exception:
+    except Exception as e:
         st.error("❌ Failed to generate quiz question.")
+
+        print(e)
         st.stop()
 
 # Generate quiz once
