@@ -1,0 +1,12 @@
+{
+  "beginner": [
+    { "title": "Variables", "goal": "Learn how to store data in Python" },
+    { "title": "If Statements", "goal": "Make decisions using if-else" }
+  ],
+  "intermediate": [
+    { "title": "Loops", "goal": "Repeat actions using for and while loops" }
+  ],
+  "advanced": [
+    { "title": "Classes", "goal": "Understand object-oriented programming with Python classes" }
+  ]
+}
