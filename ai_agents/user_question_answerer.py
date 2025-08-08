@@ -1,0 +1,281 @@
+import openai
+import os
+import json
+import re
+import logging
+from typing import Dict, Any, List
+from dataclasses import dataclass
+
+# Configure logging
+import os
+SHOW_INFO_LOGS = os.getenv("SHOW_INFO_LOGS", "False").lower() == "true"
+
+if SHOW_INFO_LOGS:
+    logging.basicConfig(level=logging.INFO)
+else:
+    logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class Answer:
+    response: str
+    explanation: str
+    examples: List[str]
+    related_topics: List[str]
+
+class QuestionAnswererAgent:
+    """
+    AI Agent for answering user questions with iterative improvement.
+    Ensures accuracy, relevance, and understandability based on user level.
+    """
+    
+    def __init__(self, api_key: str = None):
+        """Initialize the question answerer agent."""
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
+        self.client = openai.OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=self.api_key
+        )
+        
+        # Answer styles for different levels
+        self.answer_styles = {
+            "beginner": {
+                "tone": "Friendly and encouraging",
+                "complexity": "Simple explanations with analogies",
+                "examples": "Basic, step-by-step examples",
+                "detail": "Thorough explanations"
+            },
+            "intermediate": {
+                "tone": "Professional but approachable",
+                "complexity": "Clear technical explanations",
+                "examples": "Practical, real-world examples",
+                "detail": "Balanced explanations"
+            },
+            "advanced": {
+                "tone": "Professional and technical",
+                "complexity": "Advanced concepts and best practices",
+                "examples": "Complex scenarios and optimization",
+                "detail": "Concise but comprehensive"
+            }
+        }
+        
+        # Knowledge sources for different languages
+        self.knowledge_sources = {
+            "python": [
+                "Python Official Documentation (docs.python.org)",
+                "Real Python Tutorials",
+                "Python.org Tutorial",
+                "W3Schools Python",
+                "GeeksforGeeks Python"
+            ],
+            "c": [
+                "C Programming Official Documentation",
+                "GeeksforGeeks C Programming",
+                "W3Schools C Tutorial",
+                "C Tutorial Point",
+                "Learn-C.org"
+            ]
+        }
+    
+    def answer_user_question(self, question: str, language: str, user_level: str, user_name: str, 
+                       context: str = "") -> Answer:
+
+        """
+        Answer user question with iterative improvement.
+        
+        Args:
+            question: User's question
+            language: Programming language
+            user_level: User's skill level
+            user_name: User's name
+            context: Additional context about what was learned
+            
+        Returns:
+            Answer object with comprehensive response
+        """
+        logger.info(f"Answering question for {user_name}")
+        
+        max_iterations = 3
+        best_answer = None
+        best_score = 0.0
+        
+        for iteration in range(max_iterations):
+            logger.info(f"Answer generation iteration {iteration + 1}/{max_iterations}")
+            
+            # Generate answer
+            answer_data = self._create_answer(question, language, user_level, user_name, context)
+            
+            # Evaluate answer quality
+            score = self._evaluate_answer_quality(answer_data, question, language, user_level)
+            
+            # logger.info(f"Answer score: {score:.2f}")
+            
+            if score > best_score:
+                best_score = score
+                best_answer = Answer(
+                    response=answer_data["response"],
+                    explanation=answer_data["explanation"],
+                    examples=answer_data["examples"],
+                    related_topics=answer_data["related_topics"]
+                )
+            
+            # If score is high enough, break early
+            if score > 0.85:
+                logger.info("High quality answer achieved, stopping iterations")
+                break
+        
+        if best_answer is None:
+            # Fallback to basic answer
+            best_answer = self._create_fallback_answer(question, language, user_level)
+        
+        return best_answer
+    
+    def _create_answer(self, question: str, language: str, user_level: str, user_name: str, context: str) -> Dict[str, Any]:
+        """Create comprehensive answer using AI."""
+        
+        style = self.answer_styles.get(user_level.lower(), self.answer_styles["beginner"])
+        sources = self.knowledge_sources.get(language, [])
+        
+        prompt = f"""
+You are an expert programming tutor answering a question for {user_name}.
+
+LANGUAGE: {language.capitalize()}
+USER SKILL LEVEL: {user_level}
+QUESTION: {question}
+CONTEXT: {context if context else "No specific context provided"}
+
+ANSWER STYLE: {style['tone']}, {style['complexity']}, {style['detail']}
+
+TASK: Provide a comprehensive answer including:
+1. Clear and accurate response
+2. Detailed explanation
+3. 1 practical code examples
+4. Related topics for further learning
+
+REQUIREMENTS:
+- Use reliable sources: {', '.join(sources)}
+- Match the user's skill level
+- Be accurate and relevant
+- Include practical examples
+- Make it understandable for the user's level
+
+OUTPUT FORMAT (JSON):
+{{
+    "response": "Direct answer to the question",
+    "explanation": "Detailed explanation of the concept",
+    "examples": ["Code example 1"],
+    "related_topics": ["Related topic 1"],
+    "confidence": 0.95
+}}
+
+Generate a professional, educational answer:
+"""
+        
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a programming education expert."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.7
+            )
+            
+            content = response.choices[0].message.content
+            # Try to extract JSON from response
+
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            else:
+                # Fallback parsing
+                return self._parse_answer_response(content, question)
+                
+        except Exception as e:
+            logger.error(f"Error generating answer: {e}")
+            fallback = self._create_fallback_answer(question, language, user_level)
+            return {
+                "response": fallback.response,
+                "explanation": fallback.explanation,
+                "examples": fallback.examples,
+                "related_topics": fallback.related_topics,
+                "confidence": fallback.confidence
+            }
+    
+    def _evaluate_answer_quality(self, answer_data: Dict[str, Any], question: str, language: str, user_level: str) -> float:
+        """Evaluate the quality of generated answer."""
+        
+        prompt = f"""
+Evaluate this {language} programming answer for quality:
+
+Question: {question}
+User Skill Level: {user_level}
+Response: {answer_data.get('response', '')[:300]}...
+Explanation: {answer_data.get('explanation', '')[:300]}...
+Examples: {len(answer_data.get('examples', []))} examples
+Confidence: {answer_data.get('confidence', 0.5)}
+
+Rate the answer on a scale of 0.0 to 1.0 based on:
+- Accuracy and correctness (0.4 points)
+- Relevance to the question (0.3 points)
+- Understandability for user level (0.2 points)
+- Practical value and examples (0.1 points)
+
+Return only a number between 0.0 and 1.0:
+"""
+        
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a programming education evaluator."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=50,
+                temperature=0.1
+            )
+            
+            score_text = response.choices[0].message.content.strip()
+            try:
+                return float(score_text)
+            except ValueError:
+                return 0.6  # Default score
+                
+        except Exception as e:
+            logger.error(f"Error evaluating answer: {e}")
+            return 0.6
+    
+    def _create_fallback_answer(self, question: str, language: str, user_level: str) -> Answer:
+        """Create fallback answer if AI generation fails."""
+        
+        fallback_response = f"I'll help you with your {language} question. This is a {user_level} level explanation."
+        fallback_explanation = f"Let me explain this {language} concept in a way that's appropriate for your {user_level} level."
+        
+        return Answer(
+            response=fallback_response,
+            explanation=fallback_explanation,
+            examples=[f"# Basic {language} example", f"# Advanced {language} example"],
+            related_topics=["Variables", "Functions", "Control Structures"],
+        )
+    
+    def _parse_answer_response(self, content: str, question: str) -> Dict[str, Any]:
+        """Parse answer response when JSON extraction fails."""
+        
+        # Simple parsing as fallback
+        sections = content.split('\n\n')
+        
+        parsed_answer = {
+            "response": sections[0] if sections else f"Answer to: {question}",
+            "explanation": sections[1] if len(sections) > 1 else "Detailed explanation",
+            "examples": [],
+            "related_topics": ["Programming concepts", "Best practices"],
+            "confidence": 0.8
+        }
+        
+        # Try to extract examples
+        for section in sections[2:]:
+            if "example" in section.lower() or "code" in section.lower():
+                parsed_answer["examples"].append(section)
+        
+        return parsed_answer 

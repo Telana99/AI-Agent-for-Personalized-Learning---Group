@@ -1,5 +1,6 @@
 import json
 from prompts.prompt_template import build_prompt
+from ai_agent import answer_user_question
 from ai_chat_helper import ask_ai
 import os
 
@@ -97,6 +98,18 @@ while True:
         print("Goodbye! Happy coding 😊")
         break
 
-    answer = ask_ai(user_question, language=language)
+    answer = answer_user_question(user_question, language=language, user_name=user_name, level=user_level)
+
     print("\nAI Tutor says:\n")
-    print(answer)
+    print(f"Response: {answer.response}")
+    print(f"\nExplanation: {answer.explanation}")
+    
+    if answer.examples:
+        print("\n💻 Code Examples:")
+        for i, example in enumerate(answer.examples, 1):
+            print(f"\nExample {i}:")
+            print(example)
+    
+    if answer.related_topics:
+        print(f"\n🔗 Related Topics: {', '.join(answer.related_topics)}")
+
