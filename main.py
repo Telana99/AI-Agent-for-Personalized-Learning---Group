@@ -1,6 +1,6 @@
 import json
 from prompts.prompt_template import build_prompt
-from ai_agent import answer_user_question
+from ai_agents.user_question_answerer import QuestionAnswererAgent
 from ai_chat_helper import ask_ai
 import os
 
@@ -91,14 +91,15 @@ print(lesson)
 
 # Step 3: Allow user to ask questions
 print(f"\nNow you can ask {language.capitalize()} questions. Type 'exit' to stop.")
+agent = QuestionAnswererAgent()
 
 while True:
-    user_question = input("\nAsk a Python question: ")
+    user_question = input(f"\nAsk a {language} question: ")
     if user_question.lower().strip() == "exit":
         print("Goodbye! Happy coding 😊")
         break
 
-    answer = answer_user_question(user_question, language=language, user_name=user_name, level=user_level)
+    answer = agent.answer_user_question(question=user_question, language=language, user_level=user_level, user_name=user_name)
 
     print("\nAI Tutor says:\n")
     print(f"Response: {answer.response}")
