@@ -32,21 +32,77 @@ print("Welcome to the {language} Level Checker!")
 print("Answer these 3 questions to find your skill level.")
 
 # Question 1
-answer1 = input("1. What is the correct syntax to declare an integer variable in C? ")
+answer1 = input(f"\n1. What is the correct syntax to declare an integer variable in {language}? ")
 if "int" in answer1.lower():
     score += 1
 
 # Question 2
+# Define syntax templates for each language
+# Syntax templates
+syntax_map = {
+    "c": {
+        "declare_int": "int {var} = {value};",
+        "declare_float": "float {var} = {value};",
+        "print": 'printf("%.2f", {var});'
+    },
+    "python": {
+        "declare_int": "{var} = {value}",
+        "declare_float": "{var} = {value}",
+        "print": 'print(f"{{{var}:.2f}}")'
+    }
+}
+
+def generate_code(language):
+    lang = syntax_map.get(language)
+    if not lang:
+        return "Language not supported."
+    code = [
+        lang["declare_int"].format(var="a", value=5),
+        lang["declare_int"].format(var="b", value=2),
+        lang["declare_float"].format(var="c", value="a / b"),
+        lang["print"].format(var="c")
+    ]
+    return "\n".join(code)
+
+    # Syntax templates
+syntax_map = {
+    "c": {
+        "declare_int": "int {var} = {value};",
+        "declare_float": "float {var} = {value};",
+        "print": 'printf("%.2f", {var});'
+    },
+    "python": {
+        "declare_int": "{var} = {value}",
+        "declare_float": "{var} = {value}",
+        "print": 'print(f"{{{var}:.2f}}")'
+    }
+}
+
+def generate_code(language):
+    lang = syntax_map.get(language)
+    if not lang:
+        return "Language not supported."
+    code = [
+        lang["declare_int"].format(var="a", value=5),
+        lang["declare_int"].format(var="b", value=2),
+        lang["declare_float"].format(var="c", value="a / b"),
+        lang["print"].format(var="c")
+    ]
+    return "\n".join(code)
+
+# Question 2
 print("2. What will be the output of the following code?")
-print("""
-int a = 5;
-int b = 2;
-float c = a / b;
-printf(\"%.2f\", c);
-""")
+print(generate_code(language))
+
+
+# # Question 2
+# print("2. What will be the output of the following code?")
+# print(generate_code(language))
+
 answer2 = input("Your answer: ")
 if answer2.strip() == "2.00":
     score += 1
+
 
 # Question 3
 answer3 = input("3. What is the purpose of the 'const' keyword in C? ")
