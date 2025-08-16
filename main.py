@@ -1,6 +1,7 @@
 import json
 from prompts.prompt_template import build_prompt
 from ai_agents.user_question_answerer import QuestionAnswererAgent
+from ai_agents.course_content_create_agent import ContentCreateAgent
 from ai_chat_helper import ask_ai
 import os
 
@@ -32,77 +33,21 @@ print("Welcome to the {language} Level Checker!")
 print("Answer these 3 questions to find your skill level.")
 
 # Question 1
-answer1 = input(f"\n1. What is the correct syntax to declare an integer variable in {language}? ")
+answer1 = input("1. What is the correct syntax to declare an integer variable in C? ")
 if "int" in answer1.lower():
     score += 1
 
 # Question 2
-# Define syntax templates for each language
-# Syntax templates
-syntax_map = {
-    "c": {
-        "declare_int": "int {var} = {value};",
-        "declare_float": "float {var} = {value};",
-        "print": 'printf("%.2f", {var});'
-    },
-    "python": {
-        "declare_int": "{var} = {value}",
-        "declare_float": "{var} = {value}",
-        "print": 'print(f"{{{var}:.2f}}")'
-    }
-}
-
-def generate_code(language):
-    lang = syntax_map.get(language)
-    if not lang:
-        return "Language not supported."
-    code = [
-        lang["declare_int"].format(var="a", value=5),
-        lang["declare_int"].format(var="b", value=2),
-        lang["declare_float"].format(var="c", value="a / b"),
-        lang["print"].format(var="c")
-    ]
-    return "\n".join(code)
-
-    # Syntax templates
-syntax_map = {
-    "c": {
-        "declare_int": "int {var} = {value};",
-        "declare_float": "float {var} = {value};",
-        "print": 'printf("%.2f", {var});'
-    },
-    "python": {
-        "declare_int": "{var} = {value}",
-        "declare_float": "{var} = {value}",
-        "print": 'print(f"{{{var}:.2f}}")'
-    }
-}
-
-def generate_code(language):
-    lang = syntax_map.get(language)
-    if not lang:
-        return "Language not supported."
-    code = [
-        lang["declare_int"].format(var="a", value=5),
-        lang["declare_int"].format(var="b", value=2),
-        lang["declare_float"].format(var="c", value="a / b"),
-        lang["print"].format(var="c")
-    ]
-    return "\n".join(code)
-
-# Question 2
 print("2. What will be the output of the following code?")
-print(generate_code(language))
-
-
-# # Question 2
-# print("2. What will be the output of the following code?")
-# print(generate_code(language))
-
+print("""
+int a = 5;
+int b = 2;
+float c = a / b;
+printf(\"%.2f\", c);
+""")
 answer2 = input("Your answer: ")
 if answer2.strip() == "2.00":
     score += 1
-
 
 # Question 3
 answer3 = input("3. What is the purpose of the 'const' keyword in C? ")
@@ -130,32 +75,25 @@ for idx, topic in enumerate(course[user_level], start=1):
 # Step 2: Teach the first topic using prompt engineering
 print("\n Let's begin learning with the first topic!")
 
-first_topic = course[user_level][0]
+lesson_create_agent = ContentCreateAgent()
 
-prompt = build_prompt(
-    user_level=level,
-    topic_title=first_topic["title"],
-    topic_goal=first_topic["goal"],
-    user_name=user_name,
-    language=language
-)
+lesson = lesson_create_agent.create_content(user_name=user_name, user_level=user_level, language=language)
 
-
-lesson = ask_ai(prompt, language)
 print("\n AI Tutor says:\n")
 print(lesson)
 
 # Step 3: Allow user to ask questions
 print(f"\nNow you can ask {language.capitalize()} questions. Type 'exit' to stop.")
-agent = QuestionAnswererAgent()
 
+chat_history = ''
+answer_question_agent = QuestionAnswererAgent()
 while True:
-    user_question = input(f"\nAsk a {language} question: ")
-    if user_question.lower().strip() == "exit":
+    user_question = input(f"\nAsk a {language.capitalize()} question: ")
+    if user_question.lower().strip() in ["exit", "quit", "no", ""]:
         print("Goodbye! Happy coding 😊")
         break
 
-    answer = agent.answer_user_question(question=user_question, language=language, user_level=user_level, user_name=user_name)
+    answer = answer_question_agent.answer_user_question(user_question, language=language, user_name=user_name, user_level=user_level, chat_history=chat_history)
 
     print("\nAI Tutor says:\n")
     print(f"Response: {answer.response}")
@@ -169,4 +107,6 @@ while True:
     
     if answer.related_topics:
         print(f"\n🔗 Related Topics: {', '.join(answer.related_topics)}")
+        
+    chat_history = f"{user_question}: {answer.response}"
 

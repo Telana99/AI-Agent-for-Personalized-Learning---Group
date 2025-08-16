@@ -22,6 +22,7 @@ class Answer:
     explanation: str
     examples: List[str]
     related_topics: List[str]
+    confidence: float = 0.8
 
 class QuestionAnswererAgent:
     """
@@ -32,10 +33,15 @@ class QuestionAnswererAgent:
     def __init__(self, api_key: str = None):
         """Initialize the question answerer agent."""
         self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
-        self.client = openai.OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=self.api_key
-        )
+        
+        if not self.api_key:
+            logger.warning("No API key found.")
+            self.client = None
+        else:
+            self.client = openai.OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=self.api_key
+            )
         
         # Answer styles for different levels
         self.answer_styles = {
@@ -77,7 +83,7 @@ class QuestionAnswererAgent:
             ]
         }
     
-    def answer_user_question(self, question: str, language: str, user_level: str, user_name: str, 
+    def answer_user_question(self, question: str, language: str, user_level: str, user_name: str, chat_history: str,
                        context: str = "") -> Answer:
 
         """
@@ -88,6 +94,7 @@ class QuestionAnswererAgent:
             language: Programming language
             user_level: User's skill level
             user_name: User's name
+            chat_history: User's previous chat with the platform
             context: Additional context about what was learned
             
         Returns:
@@ -103,7 +110,7 @@ class QuestionAnswererAgent:
             logger.info(f"Answer generation iteration {iteration + 1}/{max_iterations}")
             
             # Generate answer
-            answer_data = self._create_answer(question, language, user_level, user_name, context)
+            answer_data = self._create_answer(question, language, user_level, user_name, chat_history, context)
             
             # Evaluate answer quality
             score = self._evaluate_answer_quality(answer_data, question, language, user_level)
@@ -116,7 +123,8 @@ class QuestionAnswererAgent:
                     response=answer_data["response"],
                     explanation=answer_data["explanation"],
                     examples=answer_data["examples"],
-                    related_topics=answer_data["related_topics"]
+                    related_topics=answer_data["related_topics"],
+                    confidence=answer_data.get("confidence", 0.8)
                 )
             
             # If score is high enough, break early
@@ -130,7 +138,7 @@ class QuestionAnswererAgent:
         
         return best_answer
     
-    def _create_answer(self, question: str, language: str, user_level: str, user_name: str, context: str) -> Dict[str, Any]:
+    def _create_answer(self, question: str, language: str, user_level: str, user_name: str, chat_history: str, context: str) -> Dict[str, Any]:
         """Create comprehensive answer using AI."""
         
         style = self.answer_styles.get(user_level.lower(), self.answer_styles["beginner"])
@@ -142,6 +150,7 @@ You are an expert programming tutor answering a question for {user_name}.
 LANGUAGE: {language.capitalize()}
 USER SKILL LEVEL: {user_level}
 QUESTION: {question}
+CHAT HISTORY: {chat_history}
 CONTEXT: {context if context else "No specific context provided"}
 
 ANSWER STYLE: {style['tone']}, {style['complexity']}, {style['detail']}
@@ -171,6 +180,10 @@ OUTPUT FORMAT (JSON):
 Generate a professional, educational answer:
 """
         
+        if not self.client:
+            logger.error("No API client available. Please set OPENROUTER_API_KEY environment variable.")
+            return self._create_fallback_answer(question, language, user_level).__dict__
+            
         try:
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -225,6 +238,10 @@ Rate the answer on a scale of 0.0 to 1.0 based on:
 Return only a number between 0.0 and 1.0:
 """
         
+        if not self.client:
+            logger.error("No API client available for evaluation. Using default score.")
+            return 0.6
+            
         try:
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -257,6 +274,7 @@ Return only a number between 0.0 and 1.0:
             explanation=fallback_explanation,
             examples=[f"# Basic {language} example", f"# Advanced {language} example"],
             related_topics=["Variables", "Functions", "Control Structures"],
+            confidence=0.7
         )
     
     def _parse_answer_response(self, content: str, question: str) -> Dict[str, Any]:
