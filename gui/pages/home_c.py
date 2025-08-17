@@ -16,8 +16,8 @@ st.markdown(
     }
     .block-container {
         padding-top: 2rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
+        padding-left: 4rem;
+        padding-right: 4rem;
     }
     .back-button {
         display: inline-block;
@@ -43,12 +43,12 @@ This AI-powered assistant will help you learn C based on your current knowledge 
 
 ### 📋 How It Works
 
-1. **Start with a Quick Quiz** (5–10 short questions)
-2. 📊 Based on your score, you will be assigned a level:
+1. Start with a **Quick Quiz** 
+2. Based on your score, you will be assigned a level:
    - 🟢 Beginner
    - 🟡 Intermediate
    - 🔵 Advanced
-3. 🤖 Then, the agent will generate lessons **custom-tailored** to your level.
+3. Then, the agent will generate lessons **custom-tailored** to your level.
 
 ---
 
