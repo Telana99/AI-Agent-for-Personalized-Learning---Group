@@ -18,7 +18,6 @@ user_id = st.session_state['user_id']
 st.title(f"📅 Create Your {subject} Study Plan")
 st.write("Let's create a personalized study plan based on your available time!")
 
-# Load curriculum to count topics
 try:
     with open(f"curriculum/{subject.lower()}_curriculum.json") as f:
         curriculum = json.load(f)['full_path']
@@ -26,16 +25,13 @@ except FileNotFoundError:
     st.error(f"Curriculum for {subject} not found.")
     st.stop()
 
-# Get user's progress
 progress = db.get_or_create_progress(user_id, subject)
 current_topic_index = progress['topic_index']
 total_topics = len(curriculum)
 remaining_topics = total_topics - current_topic_index
 
-# Get existing study hours from database
 existing_hours = db.get_study_hours(user_id, subject)
 
-# Simple form to collect hours
 with st.form("study_plan_form"):
     st.subheader("How much time can you dedicate?")
     
@@ -51,19 +47,15 @@ with st.form("study_plan_form"):
     submitted = st.form_submit_button("Create My Study Plan")
     
     if submitted:
-        # Save to DATABASE
         db.update_study_hours(user_id, subject, hours_per_day)
         st.success(f"✅ Great! You'll study {hours_per_day} hours per day.")
         st.success("💾 Your study plan has been saved!")
-        st.balloons()
 
-# Show current plan if it exists
 saved_hours = db.get_study_hours(user_id, subject)
 if saved_hours:
     st.markdown("---")
     st.subheader("📊 Your Study Plan Summary")
     
-    # Display basic info
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Study Time", f"{saved_hours} hrs/day")
@@ -72,23 +64,19 @@ if saved_hours:
     with col3:
         st.metric("Total Topics", total_topics)
     
-    # Calculate completion date
-    # Estimation: Each topic takes about 1 hour (lesson + quiz + practice)
-    # Calculate completion date - PERSONALIZED based on user level!
-    user_level = progress['level']  # Get their level from placement quiz
+
+    user_level = progress['level']  
     
-    # Personalized time estimates based on skill level
     if user_level == 'beginner':
-        hours_per_topic = 1.0  # Beginners need more time
+        hours_per_topic = 1.5  
     elif user_level == 'intermediate':
-        hours_per_topic = 0.5  # Standard pace
+        hours_per_topic = 1.0 
     elif user_level == 'advanced':
-        hours_per_topic = 0.25  # Advanced students are faster
+        hours_per_topic = 0.5 
     else:
-        hours_per_topic = 1.0  # Default if level not set yet
+        hours_per_topic = 1.0  
     
-    # But also consider the difficulty of remaining topics!
-    # Count topics by difficulty level
+
     beginner_topics = 0
     intermediate_topics = 0
     advanced_topics = 0
@@ -102,33 +90,25 @@ if saved_hours:
         elif topic_level == 'advanced':
             advanced_topics += 1
     
-    # Calculate weighted time based on both user level AND topic difficulty
     if user_level == 'beginner':
-        # Beginners struggle more with harder topics
         total_hours_needed = (beginner_topics * 1.0) + (intermediate_topics * 1.5) + (advanced_topics * 2.0)
     elif user_level == 'intermediate':
-        # Intermediate students are balanced
         total_hours_needed = (beginner_topics * 0.5) + (intermediate_topics * 1.0) + (advanced_topics * 1.5)
     elif user_level == 'advanced':
-        # Advanced students breeze through basics, only challenged by advanced topics
         total_hours_needed = (beginner_topics * 0.3) + (intermediate_topics * 0.5) + (advanced_topics * 1.0)
     else:
-        # Fallback if level not set
         total_hours_needed = remaining_topics * 1.0
 
     days_needed = total_hours_needed / saved_hours
     
-    # Round up to nearest whole day
     import math
     days_needed = math.ceil(days_needed)
     
-    # Calculate target date (from today)
     today = datetime.now()
     completion_date = today + timedelta(days=days_needed)
     
     st.markdown("---")
     st.subheader("🎯 Estimated Completion")
-    # Show personalization badge
     if user_level:
         if user_level == 'beginner':
             st.info("🎓 **Personalized for Beginners:** We've allocated extra time for challenging topics!")
@@ -178,12 +158,10 @@ if saved_hours:
     
     st.caption("💡 You can update your daily hours anytime above to see a new estimate!")
 
-    # ============ NEW: DAILY TOPIC ASSIGNMENTS ============
     st.markdown("---")
     st.subheader("📆 Your Daily Study Schedule")
     st.write("Here's what you should study each day:")
     
-    # Create daily assignments
     daily_schedule = []
     current_day = 1
     hours_accumulated = 0
@@ -193,34 +171,31 @@ if saved_hours:
         topic_name = curriculum[i]['topic']
         topic_level = curriculum[i]['level']
         
-        # Calculate hours needed for this topic based on user level
         if user_level == 'beginner':
             if topic_level == 'beginner':
                 topic_hours = 1.0
             elif topic_level == 'intermediate':
                 topic_hours = 1.5
-            else:  # advanced
+            else: 
                 topic_hours = 2.0
         elif user_level == 'intermediate':
             if topic_level == 'beginner':
                 topic_hours = 0.5
             elif topic_level == 'intermediate':
                 topic_hours = 1.0
-            else:  # advanced
+            else: 
                 topic_hours = 1.5
         elif user_level == 'advanced':
             if topic_level == 'beginner':
                 topic_hours = 0.3
             elif topic_level == 'intermediate':
                 topic_hours = 0.5
-            else:  # advanced
+            else: 
                 topic_hours = 1.0
         else:
-            topic_hours = 1.0  # default
+            topic_hours = 1.0 
         
-        # Check if this topic fits in today's schedule
         if hours_accumulated + topic_hours <= saved_hours:
-            # Add to today
             topics_for_today.append({
                 'topic': topic_name,
                 'level': topic_level,
@@ -228,7 +203,6 @@ if saved_hours:
             })
             hours_accumulated += topic_hours
         else:
-            # Save today's schedule and start a new day
             if topics_for_today:
                 daily_schedule.append({
                     'day': current_day,
@@ -236,7 +210,6 @@ if saved_hours:
                     'total_hours': hours_accumulated
                 })
             
-            # Start new day with this topic
             current_day += 1
             topics_for_today = [{
                 'topic': topic_name,
@@ -245,7 +218,6 @@ if saved_hours:
             }]
             hours_accumulated = topic_hours
     
-    # Don't forget the last day!
     if topics_for_today:
         daily_schedule.append({
             'day': current_day,
@@ -253,9 +225,7 @@ if saved_hours:
             'total_hours': hours_accumulated
         })
     
-    # Display the schedule
     if daily_schedule:
-        # Show first 7 days in detail
         days_to_show = min(7, len(daily_schedule))
         
         st.info(f"📅 Showing your first **{days_to_show} days** of study (out of {len(daily_schedule)} total days)")
@@ -266,7 +236,6 @@ if saved_hours:
             
             with st.expander(f"📅 **Day {day_num}** ({day_date}) - {day_data['total_hours']:.1f} hours", expanded=(day_num==1)):
                 for topic_info in day_data['topics']:
-                    # Color code by difficulty
                     if topic_info['level'] == 'beginner':
                         badge = "🟢"
                     elif topic_info['level'] == 'intermediate':
@@ -281,7 +250,6 @@ if saved_hours:
         if len(daily_schedule) > 7:
             st.caption(f"... and {len(daily_schedule) - 7} more days. Keep going! 💪")
         
-        # Summary
         st.markdown("---")
         st.success(f"✅ **Complete all {len(daily_schedule)} days to finish your {subject} course!**")
     else:
