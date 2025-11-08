@@ -29,6 +29,7 @@ def create_tables():
             topic_index INTEGER DEFAULT 0,
             status TEXT DEFAULT 'learning',
             assignment_score INTEGER,
+            study_hours_per_day REAL,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     ''')
@@ -99,3 +100,23 @@ def get_all_user_progress(user_id):
     ).fetchall()
     conn.close()
     return progress_records
+
+def update_study_hours(user_id, subject, hours_per_day):
+    """Updates the study hours per day for a user's subject."""
+    conn = get_db_connection()
+    conn.execute(
+        'UPDATE progress SET study_hours_per_day = ? WHERE user_id = ? AND subject = ?',
+        (hours_per_day, user_id, subject)
+    )
+    conn.commit()
+    conn.close()
+
+def get_study_hours(user_id, subject):
+    """Gets the study hours per day for a user's subject."""
+    conn = get_db_connection()
+    result = conn.execute(
+        'SELECT study_hours_per_day FROM progress WHERE user_id = ? AND subject = ?',
+        (user_id, subject)
+    ).fetchone()
+    conn.close()
+    return result['study_hours_per_day'] if result and result['study_hours_per_day'] else None
