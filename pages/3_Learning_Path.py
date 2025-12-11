@@ -364,7 +364,7 @@ elif topic_state == 'failed_quiz':
                 db.apply_learning(user_id, subject, viewing_id)
 
     st.markdown("---")
-    if st.button("✅ I'm ready to try the quiz again", type="primary", use_container_width=True):
+    if st.button("I'm ready to try the quiz again", type="primary", use_container_width=True):
         bdi_state_key = BDI_STATE 
         
         keys_to_clear = [k for k in st.session_state.keys() if k.startswith(f"bdi_{viewing_id}_") and k != bdi_state_key]
